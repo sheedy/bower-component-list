@@ -64,7 +64,7 @@ function fetchComponents() {
 						// instead just return `undefined` and filter it out later
 						deferred.resolve();
 					} else {
-						deferred.reject(new Error(err));
+						deferred.reject(new Error('GitHub fetch failed\n' + err + '\n' + body));
 					}
 				}
 				return deferred.promise;
