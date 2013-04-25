@@ -50,6 +50,9 @@ function fetchComponents() {
 				qs: {
 					client_id: process.env.GITHUB_CLIENT_ID,
 					client_secret: process.env.GITHUB_CLIENT_SECRET
+				},
+				headers: {
+					'User-Agent': 'Node.js'
 				}
 			}, function (err, response, body) {
 				if (!err && response.statusCode === 200) {
