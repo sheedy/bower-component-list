@@ -2,6 +2,7 @@
 'use strict';
 var request = require('request');
 var Q = require('q');
+var cachedResults;
 
 var REGISTRY_URL = 'https://bower.herokuapp.com/packages';
 
@@ -30,6 +31,7 @@ function fetchComponents() {
 		});
 		return deferred.promise;
 	}).then(function (list) {
+		var apiLimitExceeded = false;
 		var results = list.map(function (el) {
 			var deferred = Q.defer();
 			var re = /github\.com\/([\w\-\.]+)\/([\w\-\.]+)/i;
@@ -55,25 +57,36 @@ function fetchComponents() {
 					'User-Agent': 'Node.js'
 				}
 			}, function (err, response, body) {
-				if (!err && response.statusCode === 200) {
+				if (!err && body && /API Rate Limit Exceeded/.test(body.message)) {
+					apiLimitExceeded = true;
+					deferred.resolve();
+				} else if (!err && response.statusCode === 200) {
 					deferred.resolve(createComponentData(el.name, body));
 				} else {
-					if (response.statusCode === 404) {
+					if (response && response.statusCode === 404) {
 						// uncomment to get a list of registry items pointing
 						// to non-existing repos
 						//console.log(el.name + '\n' + el.url + '\n');
 
 						// don't fail just because the repo doesnt exist
 						// instead just return `undefined` and filter it out later
+						console.log('Repo returned 404', el.name);
 						deferred.resolve();
 					} else {
-						deferred.reject(new Error('GitHub fetch failed\n' + err + '\n' + body));
+						deferred.reject(new Error('GitHub fetch failed\n' + err + '\n' + body + '\n' + response));
 					}
 				}
 				return deferred.promise;
 			});
 			return deferred.promise;
 		});
+
+		if (apiLimitExceeded) {
+			console.log('API limit exceeded. Using cached GitHub results.');
+			return Q.all(cachedResults);
+		}
+
+		cachedResults = results;
 
 		console.log('Finished fetching data from Bower registry', '' + new Date());
 		return Q.all(results);

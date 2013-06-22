@@ -5,9 +5,10 @@ var Q = require('q');
 var fetchComponents = require('./component-list');
 
 var componentListEntity;
+var entity;
 
 var HTTP_PORT = process.env.PORT || 8011;
-var UPDATE_INTERVAL_IN_MINUTES =  60;
+var UPDATE_INTERVAL_IN_MINUTES =  480;
 
 
 function getComponentListEntity() {
@@ -21,7 +22,7 @@ function getComponentListEntity() {
 			return el !== null && el !== undefined;
 		});
 
-		var entity = {json: JSON.stringify(list)};
+		entity = {json: JSON.stringify(list)};
 		var shasum = crypto.createHash('sha1');
 		shasum.update(entity.json);
 		entity.etag = shasum.digest('hex');
@@ -29,7 +30,12 @@ function getComponentListEntity() {
 		// update the entity
 		componentListEntity = deferred.promise;
 	}).fail(function (err) {
-		deferred.reject(err);
+		console.log('fetchComponents error', err);
+		if (entity) {
+			deferred.resolve(asset);
+		} else {
+			deferred.reject(err);
+		}
 	});
 
 	return deferred.promise;
@@ -50,7 +56,8 @@ function getComponentList(request, response, next) {
 
 		response.statusCode = 200;
 		response.end(new Buffer(entity.json));
-	}).fail(function(err) {
+	}).fail(function (err) {
+		console.error('' + new Date(), 'Failed serving componentListEntity', err);
 		next(err);
 	});
 }
@@ -61,7 +68,7 @@ componentListEntity = getComponentListEntity();
 
 connect()
 	.use(connect.errorHandler())
-	.use(connect.timeout(10000))
+	.use(connect.timeout(20000))
 	.use(connect.logger('dev'))
 	.use(getComponentList)
 	.listen(HTTP_PORT);
