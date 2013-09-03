@@ -70,6 +70,7 @@ connect()
 	.use(connect.errorHandler())
 	.use(connect.timeout(20000))
 	.use(connect.logger('dev'))
+	.use(connect.compress())
 	.use(getComponentList)
 	.listen(HTTP_PORT);
 
