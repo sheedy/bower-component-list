@@ -15,7 +15,7 @@ function createComponentData(name, data) {
 		forks: data.forks,
 		stars: data.watchers,
 		created: data.created_at,
-		updated: data.updated_at
+		updated: data.pushed_at
 	};
 }
 
