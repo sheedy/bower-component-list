@@ -68,7 +68,7 @@ componentListEntity = getComponentListEntity();
 
 connect()
 	.use(connect.errorHandler())
-	.use(connect.timeout(20000))
+	.use(connect.timeout(60000))
 	.use(connect.logger('dev'))
 	.use(connect.compress())
 	.use(getComponentList)

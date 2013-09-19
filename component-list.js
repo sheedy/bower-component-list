@@ -22,10 +22,11 @@ function createComponentData(name, data) {
 function fetchComponents() {
 	return Q.fcall(function () {
 		var deferred = Q.defer();
-		request.get(REGISTRY_URL, {json: true}, function(err, response, body) {
+		request.get(REGISTRY_URL, {json: true, timeout: 60000}, function(err, response, body) {
 			if (!err && response.statusCode === 200) {
 				deferred.resolve(body);
 			} else {
+				console.log('err bower registry', err, response, body);
 				deferred.reject(new Error(err));
 			}
 		});
@@ -55,25 +56,22 @@ function fetchComponents() {
 				},
 				headers: {
 					'User-Agent': 'Node.js'
-				}
+				},
+				timeout: 60000
 			}, function (err, response, body) {
 				if (!err && body && /API Rate Limit Exceeded/.test(body.message)) {
 					apiLimitExceeded = true;
+					deferred.resolve();
+				} else if (/Repository access blocked/.test(body.message)) {
 					deferred.resolve();
 				} else if (!err && response.statusCode === 200) {
 					deferred.resolve(createComponentData(el.name, body));
 				} else {
 					if (response && response.statusCode === 404) {
-						// uncomment to get a list of registry items pointing
-						// to non-existing repos
-						//console.log(el.name + '\n' + el.url + '\n');
-
-						// don't fail just because the repo doesnt exist
-						// instead just return `undefined` and filter it out later
-						console.log('Repo returned 404', el.name);
 						deferred.resolve();
 					} else {
-						deferred.reject(new Error('GitHub fetch failed\n' + err + '\n' + body + '\n' + response));
+						console.log('err github fetch', err, body, response);
+						deferred.resolve();
 					}
 				}
 				return deferred.promise;
