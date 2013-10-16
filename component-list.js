@@ -6,8 +6,8 @@ var cachedResults;
 
 var REGISTRY_URL = 'https://bower.herokuapp.com/packages';
 
-function createComponentData(name, data) {
-	return {
+function createComponentData(name, data, keywords) {
+	var ret = {
 		name: name,
 		description: data.description,
 		owner: data.owner.login,
@@ -17,6 +17,12 @@ function createComponentData(name, data) {
 		created: data.created_at,
 		updated: data.pushed_at
 	};
+
+	if (keywords) {
+		ret.keywords = keywords;
+	}
+
+	return ret;
 }
 
 // to get a diff between old fetched repos and new repos
@@ -37,20 +43,27 @@ function getDiffFromExistingRepos(newRepos) {
 	}
 }
 
+function fetchKeywords(user, repo, file, cb) {
+	var url = 'https://raw.github.com/' + user + '/' + repo + '/master/'+ file;
+
+	request.get(url, {json: true}, function (err, response, body) {
+		if (!err && body && body.keywords) {
+			cb(null, body.keywords);
+		} else {
+			cb(true);
+		}
+	});
+}
+
 function fetchComponents(fetchNew) {
 	return Q.fcall(function () {
 		var deferred = Q.defer();
 		request.get(REGISTRY_URL, {json: true, timeout: 60000}, function (err, response, body) {
 			if (!err && response.statusCode === 200) {
-				if (fetchNew === true) {
-					deferred.resolve(getDiffFromExistingRepos(body));
-				} else {
-					deferred.resolve(body);
-				}
-
+				deferred.resolve(fetchNew === true ? getDiffFromExistingRepos(body) : body);
 			} else {
-				console.log('err bower registry', err, response, body);
-				deferred.reject(new Error(err));
+				console.log('err bower registry', response.statusCode, err, body);
+				deferred.reject(err);
 			}
 		});
 		return deferred.promise;
@@ -88,21 +101,36 @@ function fetchComponents(fetchNew) {
 				} else if (body && /Repository access blocked/.test(body.message)) {
 					deferred.resolve();
 				} else if (!err && response.statusCode === 200) {
-					if (fetchNew === true) {
-						cachedResults.push(createComponentData(el.name, body));
-					}
+					var complete = function (keywords) {
+						if (fetchNew === true) {
+							cachedResults.push(createComponentData(el.name, body, keywords));
+						}
 
-					deferred.resolve(createComponentData(el.name, body));
+						deferred.resolve(createComponentData(el.name, body, keywords));
+					};
+
+					fetchKeywords(user, repo, 'bower.json', function (err, keywords) {
+						if (err) {
+							fetchKeywords(user, repo, 'package.json', function (err, keywords) {
+								complete(keywords);
+							});
+							return;
+						}
+
+						complete(keywords);
+					});
 				} else {
 					if (response && response.statusCode === 404) {
 						deferred.resolve();
 					} else {
-						console.log('err github fetch', err, body, response);
+						console.log('err github fetch', el.name, response.statusCode, err, body);
 						deferred.resolve();
 					}
 				}
+
 				return deferred.promise;
 			});
+
 			return deferred.promise;
 		});
 
@@ -113,7 +141,7 @@ function fetchComponents(fetchNew) {
 
 		if (fetchNew === false) {
 			cachedResults = results;
-                }
+		}
 
 		console.log('Finished fetching data from Bower registry', '' + new Date());
 		return Q.all(fetchNew === true ? cachedResults.concat(results) : results);
