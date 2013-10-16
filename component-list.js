@@ -21,9 +21,7 @@ function createComponentData(name, data) {
 
 // to get a diff between old fetched repos and new repos
 function getDiffFromExistingRepos(newRepos) {
-
 	if (typeof newRepos === 'object' && typeof cachedResults === 'object') {
-
 		// get an array of old repos name
 		var existingReposName = cachedResults.map(function (item) {
 			if (typeof item != 'undefined') {
@@ -42,7 +40,7 @@ function getDiffFromExistingRepos(newRepos) {
 function fetchComponents(fetchNew) {
 	return Q.fcall(function () {
 		var deferred = Q.defer();
-		request.get(REGISTRY_URL, {json: true, timeout: 60000}, function(err, response, body) {
+		request.get(REGISTRY_URL, {json: true, timeout: 60000}, function (err, response, body) {
 			if (!err && response.statusCode === 200) {
 				if (fetchNew === true) {
 					deferred.resolve(getDiffFromExistingRepos(body));
@@ -84,7 +82,6 @@ function fetchComponents(fetchNew) {
 				},
 				timeout: 60000
 			}, function (err, response, body) {
-
 				if (!err && body && /API Rate Limit Exceeded/.test(body.message)) {
 					apiLimitExceeded = true;
 					deferred.resolve();
@@ -94,10 +91,8 @@ function fetchComponents(fetchNew) {
 					if (fetchNew === true) {
 						cachedResults.push(createComponentData(el.name, body));
 					}
+
 					deferred.resolve(createComponentData(el.name, body));
-
-
-                                  console.log(body.full_name);
 				} else {
 					if (response && response.statusCode === 404) {
 						deferred.resolve();
