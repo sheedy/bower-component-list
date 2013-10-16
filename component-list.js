@@ -19,12 +19,37 @@ function createComponentData(name, data) {
 	};
 }
 
-function fetchComponents() {
+// to get a diff between old fetched repos and new repos
+function getDiffFromExistingRepos(newRepos) {
+
+	if (typeof newRepos === 'object' && typeof cachedResults === 'object') {
+
+		// get an array of old repos name
+		var existingReposName = cachedResults.map(function (item) {
+			if (typeof item != 'undefined') {
+				return item.name;
+			}
+		});
+
+		return newRepos.filter(function (item) {
+			if (typeof item != 'undefined') {
+				return existingReposName.indexOf(item.name) < 0;
+			}
+		});
+	}
+}
+
+function fetchComponents(fetchNew) {
 	return Q.fcall(function () {
 		var deferred = Q.defer();
 		request.get(REGISTRY_URL, {json: true, timeout: 60000}, function(err, response, body) {
 			if (!err && response.statusCode === 200) {
-				deferred.resolve(body);
+				if (fetchNew === true) {
+					deferred.resolve(getDiffFromExistingRepos(body));
+				} else {
+					deferred.resolve(body);
+				}
+
 			} else {
 				console.log('err bower registry', err, response, body);
 				deferred.reject(new Error(err));
@@ -59,13 +84,20 @@ function fetchComponents() {
 				},
 				timeout: 60000
 			}, function (err, response, body) {
+
 				if (!err && body && /API Rate Limit Exceeded/.test(body.message)) {
 					apiLimitExceeded = true;
 					deferred.resolve();
-				} else if (/Repository access blocked/.test(body.message)) {
+				} else if (body && /Repository access blocked/.test(body.message)) {
 					deferred.resolve();
 				} else if (!err && response.statusCode === 200) {
+					if (fetchNew === true) {
+						cachedResults.push(createComponentData(el.name, body));
+					}
 					deferred.resolve(createComponentData(el.name, body));
+
+
+                                  console.log(body.full_name);
 				} else {
 					if (response && response.statusCode === 404) {
 						deferred.resolve();
@@ -84,10 +116,12 @@ function fetchComponents() {
 			return Q.all(cachedResults);
 		}
 
-		cachedResults = results;
+		if (fetchNew === false) {
+			cachedResults = results;
+                }
 
 		console.log('Finished fetching data from Bower registry', '' + new Date());
-		return Q.all(results);
+		return Q.all(fetchNew === true ? cachedResults.concat(results) : results);
 	});
 }
 
