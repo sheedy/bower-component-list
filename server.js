@@ -3,84 +3,87 @@ var crypto = require('crypto');
 var connect = require('connect');
 var Q = require('q');
 var fetchComponents = require('./component-list');
-
-var componentListEntity;
+var registry;
 var entity;
 
 var HTTP_PORT = process.env.PORT || 8011;
 //interval for updating old repos
 var UPDATE_OLD_REPOS_INTERVAL_IN_DAYS =  7;
 //interval for fetching new repos
-var UPDATE_NEW_REPOS_INTERVAL_IN_MINUTES = 15;
+var UPDATE_NEW_REPOS_INTERVAL_IN_MINUTES = 60;
+
+function createEntity(list) {
+	var obj = {json: JSON.stringify(list)};
+	var shasum = crypto.createHash('sha1');
+	shasum.update(obj.json);
+	obj.etag = shasum.digest('hex');
+	return obj;
+}
+
+function createCustomEntity(keyword) {
+	return createEntity(registry.filter(function (el) {
+		return el.keywords && el.keywords.indexOf(keyword) !== -1;
+	}));
+}
 
 function getComponentListEntity(fetchNew) {
-	var deferred = Q.defer();
-
 	fetchComponents(fetchNew || false).then(function (list) {
 		console.log('Finished fetching data from GitHub', '' + new Date());
 
-		// TODO: Find a way for the promise not to return null so this isn't needed
-		list = list.filter(function (el) {
-			return el !== null && el !== undefined;
+		registry = list.filter(function (el) {
+			return el != null;
 		});
 
-		entity = {json: JSON.stringify(list)};
-		var shasum = crypto.createHash('sha1');
-		shasum.update(entity.json);
-		entity.etag = shasum.digest('hex');
-		deferred.resolve(entity);
-		// update the entity
-		componentListEntity = deferred.promise;
+		entity = createEntity(registry);
 	}).fail(function (err) {
 		console.log('fetchComponents error', err);
-		if (entity) {
-			deferred.resolve(asset);
-		} else {
-			deferred.reject(err);
-		}
-	});
-
-	return deferred.promise;
-}
-
-function getComponentList(request, response, next) {
-	componentListEntity.then(function (entity) {
-		// allow CORS
-		response.setHeader('ETag', entity.etag);
-		response.setHeader('Access-Control-Allow-Origin', '*');
-		response.setHeader('Content-Type', 'application/json');
-
-		if (request.headers['if-none-match'] === entity.etag) {
-			response.statusCode = 304;
-			response.end();
-			return;
-		}
-
-		response.statusCode = 200;
-		response.end(new Buffer(entity.json));
-	}).fail(function (err) {
-		console.error('' + new Date(), 'Failed serving componentListEntity', err);
-		next(err);
 	});
 }
 
-// componentListEntity - promise {etag: '', json: ''}
-// using a promise so that clients can connect and wait for the initial entity
-componentListEntity = getComponentListEntity();
+function serveComponentList(request, response, next) {
+	if (!entity) {
+		console.error('Entity empty. Registry might not have finished fetching yet.');
+		response.statusCode = 418;
+		response.end();
+		return;
+	}
+
+	var localEntity = entity;
+	var matches = /^\/keyword\/([\w-]+)/.exec(request._parsedUrl.pathname);
+
+	if (matches) {
+		localEntity = createCustomEntity(matches[1]);
+	}
+
+	response.setHeader('ETag', localEntity.etag);
+	response.setHeader('Access-Control-Allow-Origin', '*');
+	response.setHeader('Content-Type', 'application/json');
+
+	if (request.headers['if-none-match'] === localEntity.etag) {
+		response.statusCode = 304;
+		response.end();
+		return;
+	}
+
+	response.statusCode = 200;
+	response.end(new Buffer(localEntity.json));
+}
+
+getComponentListEntity();
 
 connect()
 	.use(connect.errorHandler())
 	.use(connect.timeout(60000))
 	.use(connect.logger('dev'))
 	.use(connect.compress())
-	.use(getComponentList)
+	.use(serveComponentList)
 	.listen(HTTP_PORT);
 
 //interval for getting old repository every week
 setInterval(getComponentListEntity, UPDATE_OLD_REPOS_INTERVAL_IN_DAYS * 24 * 60 * 60 * 1000);
 
 //interval for fetching new repos
-setInterval(function() {
+setInterval(function () {
 	getComponentListEntity(true);
 }, UPDATE_NEW_REPOS_INTERVAL_IN_MINUTES * 60 * 1000);
 

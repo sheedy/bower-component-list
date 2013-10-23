@@ -1,6 +1,7 @@
 /*jshint camelcase:false */
 'use strict';
 var request = require('request');
+var throat = require('throat');
 var Q = require('q');
 var cachedResults;
 
@@ -69,7 +70,7 @@ function fetchComponents(fetchNew) {
 		return deferred.promise;
 	}).then(function (list) {
 		var apiLimitExceeded = false;
-		var results = list.map(function (el) {
+		var results = list.map(throat(10, function (el) {
 			var deferred = Q.defer();
 			var re = /github\.com\/([\w\-\.]+)\/([\w\-\.]+)/i;
 			var parsedUrl = re.exec(el.url.replace(/\.git$/, ''));
@@ -132,7 +133,7 @@ function fetchComponents(fetchNew) {
 			});
 
 			return deferred.promise;
-		});
+		}));
 
 		if (apiLimitExceeded) {
 			console.log('API limit exceeded. Using cached GitHub results.');
