@@ -1,8 +1,10 @@
 # bower-component-list
 
-Aggregated list of components from the [Bower registry](https://bower.herokuapp.com/packages) and GitHub metadata.
+Aggregated list of components from the [Bower registry](https://bower.herokuapp.com/packages), GitHub metadata, bower.json/package.json keywords.
 
 Currently used as the back-end for the [Bower components site](https://github.com/sindresorhus/bower-components).
+
+The registry can also be filtered on a keyword to only get a subset of it. Useful if you for example want to embed a list of plugins for your framework on its website. Example: https://bower-component-list.herokuapp.com/keyword/web-components
 
 
 ### Getting Started
@@ -18,5 +20,4 @@ You can change the port by setting the `PORT` environment variable.
 
 ## License
 
-[MIT License](http://en.wikipedia.org/wiki/MIT_License)
-(c) [Sindre Sorhus](http://sindresorhus.com)
+MIT © [Sindre Sorhus](http://sindresorhus.com)
